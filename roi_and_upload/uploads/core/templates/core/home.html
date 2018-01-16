@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <ul>
+    <li>
+      <a href="{% url 'model_form_upload' %}">Model Form Upload</a>
+    </li>
+  </ul>
+  <input type='file' id="fileUpload" />
+  <a id="download" href="#" download="name.png" onclick="this.href=canvasResult.toDataURL();">下載</a>
+  <div>
+    上傳圖片，圈選roi後，下方將顯示roi結果，再按下載(支援多重roi區域)
+  </div>
+  <div>
+    <canvas width="1000" height="800" id="canvasInput" ></canvas>
+    <!--first law picture-->
+  </div>
+  <div>
+    <canvas width="1000" height="800" id="canvasResult" ></canvas>
+    <!--first law picture-->
+  </div>
+  {% load staticfiles %}
+  <script>
+  function el(id) { return document.getElementById(id); } // Get elem by ID
+
+  var mx, my;
+
+  // load picture
+
+  var canvasInput = document.getElementById("canvasInput"); // The canvas hover on the input image
+  var ctxInput = canvasInput.getContext("2d"); // The canvas contant
+  var canvasResult = document.getElementById("canvasResult"); // The canvas hover on the result image
+  var ctxResult = canvasResult.getContext("2d"); // The canvas cantant
+
+  function readImage() {
+    file_name = this.value.split('/').pop().split('\\').pop();
+    if (this.files && this.files[0]) {
+      var FR = new FileReader();
+      FR.onload = function(e) {
+        img_load = new Image();
+        img_load.addEventListener("load", function() {
+          canvasInput.width = img_load.width;
+          canvasInput.height = img_load.height;
+          canvasResult.width = img_load.width;
+          canvasResult.height = img_load.height;
+
+          ctxInput.drawImage(img_load, 0, 0);
+        });
+        img_load.src = e.target.result;
+      };
+      FR.readAsDataURL(this.files[0]);
+      document.getElementById("download").setAttribute("download", file_name)
+    }
+  }
+  document.getElementById("fileUpload").addEventListener("change", readImage, false);
+
+  var mark_matrix_x = new Array();
+  var mark_matrix_y = new Array();
+
+  canvasInput.addEventListener('mousedown', mouseDown);
+  canvasInput.addEventListener('mousemove', mouseMove);
+  canvasInput.addEventListener('mouseup', mouseUp);
+
+  function mouseDown(e) {
+    this.draw = true;
+    ctxInput.strokeStyle = '#000000';
+    ctxInput.lineWidth = 2;
+
+    this.offsetX = this.offsetLeft;
+    this.offsetY = this.offsetTop;
+
+    var o = this;
+    while (o.offsetParent) {
+      o = o.offsetParent;
+      this.offsetX += o.offsetLeft;
+      this.offsetY += o.offsetTop;
+    }
+
+    ctxInput.beginPath();
+    ctxInput.moveTo(e.pageX - this.offsetX, e.pageY - this.offsetY);
+  }
+
+  function mouseMove(e) {
+    if (this.draw) {
+      ctxInput.lineWidth = 0.25 ;
+      ctxInput.lineCap = 'round' ;
+      ctxInput.lineJoin = 'round' ;
+      ctxInput.save();
+//      ctxInput.beginPath();
+
+      mx = event.clientX - canvasInput.getBoundingClientRect().x + window.pageXOffset;
+      my = event.clientY - canvasInput.getBoundingClientRect().y + window.pageYOffset;
+
+      ctxInput.lineTo(mx, my);
+      ctxInput.moveTo(mx, my);
+
+      mark_matrix_x.push(mx);
+      mark_matrix_y.push(my);
+
+      //pointcounter.textContent =mark_matrix[2];
+
+//      ctxInput.arc(mx, my, 1, 0, 2 * Math.PI);
+
+      ctxInput.closePath(); //結束時自動連回beginpath
+      ctxInput.stroke();
+      ctxInput.restore();
+    }
+  }
+
+  function mouseUp(e) {
+    this.draw = false;
+    ctxResult.save();
+    ctxResult.beginPath();
+
+    ctxResult.moveTo(mark_matrix_x[0], mark_matrix_y[0]);
+
+    for (i = 0; i < mark_matrix_x.length; i ++) {
+      ctxResult.lineTo(mark_matrix_x[i], mark_matrix_y[i]); //劃出全部點
+    }
+
+    ctxResult.closePath(); //結束時自動連回beginpath
+//    ctxResult.stroke();
+    ctxResult.clip();
+    ctxResult.drawImage(img_load, 0, 0);
+    ctxResult.restore();
+
+    mark_matrix_x = [];
+    mark_matrix_y = [];
+  }
+  </script>
+{% endblock %}
